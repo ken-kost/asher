@@ -67,14 +67,8 @@ Install the escript straight from GitHub:
 mix escript.install github <your-fork-or-org>/asher
 ```
 
-This builds and installs an `asher` executable into `~/.mix/escripts`. Make sure that
-directory is on your `PATH`:
-
-```sh
-export PATH="$PATH:$HOME/.mix/escripts"
-```
-
-Then, from any directory you want to use as a contribution workspace:
+That builds and installs an `asher` binary into your Mix **escripts** directory. The next
+step is to make `asher` runnable from anywhere — see below — then:
 
 ```sh
 mkdir ash-contribs && cd ash-contribs
@@ -82,6 +76,62 @@ asher setup ash-project
 asher init
 ```
 
+#### Put `asher` on your `PATH`
+
+First, find where the binary was installed (works on every setup):
+
+```sh
+mix escript
+# → Escripts installed at: /path/to/.mix/escripts
+```
+
+- Plain installs: `~/.mix/escripts`
+- **asdf**: a *per-Elixir-version* directory, e.g. `$(asdf where elixir)/.mix/escripts`
+  (so `asher` is tied to the Elixir version you installed it under)
+- **mise**: `"$(mise where elixir)/.mix/escripts"`
+
+**Quick way (any shell): symlink into a `bin` dir that's already on your `PATH`.** Many
+systems already have `~/.local/bin` on `PATH`:
+
+```sh
+mkdir -p ~/.local/bin
+ln -sf "$(asdf where elixir)/.mix/escripts/asher" ~/.local/bin/asher   # asdf
+# non-asdf: ln -sf "$HOME/.mix/escripts/asher" ~/.local/bin/asher
+```
+
+Or add the escripts directory to your `PATH` in your shell's startup file:
+
+**zsh / oh-my-zsh** — add to `~/.zshrc` (or drop it in `~/.oh-my-zsh/custom/asher.zsh`,
+which oh-my-zsh auto-loads), then `source ~/.zshrc`:
+
+```sh
+# asdf (version-aware):
+export PATH="$PATH:$(asdf where elixir)/.mix/escripts"
+# non-asdf:
+# export PATH="$PATH:$HOME/.mix/escripts"
+```
+
+**bash** — the same lines in `~/.bashrc` (also `~/.bash_profile` or `~/.profile` for login
+shells, e.g. fresh WSL terminals), then `source ~/.bashrc`.
+
+**fish** — in `~/.config/fish/config.fish`:
+
+```fish
+fish_add_path (asdf where elixir)/.mix/escripts   # asdf
+# fish_add_path $HOME/.mix/escripts               # non-asdf
+```
+
+Verify:
+
+```sh
+asher --version
+```
+
+> **asdf/mise tip:** escripts install *per language version*, so switching Elixir versions
+> means `asher` won't be found until you reinstall it under the new version. To install
+> escripts to one stable, version-independent location, set `export MIX_HOME="$HOME/.mix"`
+> in your shell rc (before running mix), reinstall with `mix escript.install github …`, and
+> put `$HOME/.mix/escripts` on your `PATH`.
 
 ### Option B — clone and use the mix tasks
 

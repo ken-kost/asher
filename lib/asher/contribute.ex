@@ -114,29 +114,56 @@ defmodule Asher.Contribute do
 
   defp pr_title(survey), do: survey.name
 
-  defp pr_body(survey, entry) do
+  # The standard ash-project pull request template.
+  @checklist """
+  # Contributor checklist
+
+  Leave anything that you believe does not apply unchecked.
+
+  - [ ] I accept the [AI Policy](https://github.com/ash-project/.github/blob/main/AI_POLICY.md), or AI was not used in the creation of this PR.
+  - [ ] Bug fixes include regression tests
+  - [ ] Chores
+  - [ ] Documentation changes
+  - [ ] Features include unit/acceptance tests
+  - [ ] Refactoring
+  - [ ] Update dependencies\
+  """
+
+  @doc false
+  # The PR body: the linked issue first (when provided), then the ash-project
+  # contributor checklist, then the details asher gathered. Checklist items are
+  # left unchecked for the contributor to fill in (including the AI Policy
+  # acceptance — asher won't accept it on your behalf).
+  def pr_body(survey, entry) do
     folder = Contribution.folder_name(survey.slug, Enum.map(survey.repos, & &1["name"]))
 
+    [issue_reference(survey.issue, entry), @checklist, details(survey, folder)]
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join("\n\n")
+    |> Kernel.<>("\n")
+  end
+
+  defp details(survey, folder) do
     """
-    #{issue_reference(survey.issue, entry)}## #{survey.name}
+    ## Details
 
     - **Category:** #{survey.category}
     - **Repos:** #{Enum.map_join(survey.repos, ", ", & &1["full_name"])}
     - **Labels:** #{labels(survey.scraped)}
 
-    > Draft scaffolded by [asher](https://github.com/ash-project). Tracking folder: `data/#{folder}`.
+    _Scaffolded by [asher](https://github.com/ash-project). Tracking folder: `data/#{folder}`._\
     """
   end
 
-  # `Closes #n` only on the repo that owns the issue; otherwise link it.
+  # `Closes #n` on the repo that owns the issue; a link on the others; "" if none.
   defp issue_reference(nil, _entry), do: ""
 
   defp issue_reference(issue, entry) do
     cond do
       is_nil(issue.number) -> ""
-      issue.full_name == entry["full_name"] -> "Closes ##{issue.number}\n\n"
-      issue.url -> "Related issue: #{issue.url}\n\n"
-      true -> "Related issue: #{issue.full_name}##{issue.number}\n\n"
+      issue.full_name == entry["full_name"] -> "Closes ##{issue.number}"
+      issue.url -> "Related issue: #{issue.url}"
+      true -> "Related issue: #{issue.full_name}##{issue.number}"
     end
   end
 

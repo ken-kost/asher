@@ -4,23 +4,28 @@ defmodule Asher.Contribution do
   folder naming, and the metadata receipt written under `data/`.
   """
 
-  @categories ["feature", "enhancement", "bug fix", "improvement", "documentation"]
+  @categories ["feature", "enhancement", "bug fix", "improvement", "documentation", "test"]
 
   @prefixes %{
     "feature" => "feat",
     "enhancement" => "enhance",
     "bug fix" => "fix",
     "improvement" => "improve",
-    "documentation" => "docs"
+    "documentation" => "docs",
+    "test" => "test"
   }
 
   @doc "The selectable contribution categories, in display order."
   @spec categories() :: [String.t()]
   def categories, do: @categories
 
-  @doc "Git branch prefix for a category (defaults to `feat` for unknowns)."
+  @doc """
+  Git/commit prefix for a category. Known categories map to a short conventional
+  prefix (`feature` → `feat`, `bug fix` → `fix`, …); a custom category is
+  slugified for use as its own prefix (e.g. `"perf"` → `perf`).
+  """
   @spec category_prefix(String.t()) :: String.t()
-  def category_prefix(category), do: Map.get(@prefixes, category, "feat")
+  def category_prefix(category), do: Map.get(@prefixes, category) || slugify(category)
 
   @doc "Branch name for a contribution, e.g. `fix/add-upsert-support`."
   @spec branch_name(String.t(), String.t()) :: String.t()

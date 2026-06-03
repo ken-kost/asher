@@ -71,6 +71,19 @@ defmodule Asher.SurveyTest do
     assert survey.slug == "custom-name"
   end
 
+  test "supports the built-in `test` category and a custom `other` category" do
+    StubShell.stub(fn _, _, _ -> {"", 0} end)
+
+    # category index 5 is `test`
+    s1 = run("n\n5\n1\n0\nAdd tests\n")
+    assert s1.category == "test"
+
+    # index 6 is `other` → next input is the custom category
+    s2 = run("n\n6\nperf\n1\n0\nSpeed things up\n")
+    assert s2.category == "perf"
+    assert Enum.map(s2.repos, & &1["name"]) == ["ash"]
+  end
+
   test "continues gracefully when scraping fails" do
     StubShell.stub(fn "gh", ["issue", "view" | _], _ -> {"not found", 1} end)
 
@@ -90,6 +103,7 @@ defmodule Asher.SurveyTest do
       assert Survey.derive_category(%{"labels" => ["bug"]}) == "bug fix"
       assert Survey.derive_category(%{"labels" => ["enhancement"]}) == "enhancement"
       assert Survey.derive_category(%{"labels" => ["documentation"]}) == "documentation"
+      assert Survey.derive_category(%{"labels" => ["test"]}) == "test"
       assert Survey.derive_category(%{"labels" => ["feature request"]}) == "feature"
       assert Survey.derive_category(%{"labels" => ["needs-improvement"]}) == "improvement"
     end

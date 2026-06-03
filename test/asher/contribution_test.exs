@@ -33,10 +33,16 @@ defmodule Asher.ContributionTest do
       assert Contribution.category_prefix("bug fix") == "fix"
       assert Contribution.category_prefix("improvement") == "improve"
       assert Contribution.category_prefix("documentation") == "docs"
+      assert Contribution.category_prefix("test") == "test"
     end
 
-    test "unknown categories default to feat" do
-      assert Contribution.category_prefix("whatever") == "feat"
+    test "custom categories are slugified into their own prefix" do
+      assert Contribution.category_prefix("perf") == "perf"
+      assert Contribution.category_prefix("My Custom Category") == "my-custom-category"
+    end
+
+    test "`test` is a built-in category" do
+      assert "test" in Contribution.categories()
     end
 
     test "branch_name combines prefix and slug" do

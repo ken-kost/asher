@@ -70,6 +70,9 @@ defmodule Asher.Survey do
       Enum.any?(labels, &(String.contains?(&1, "documentation") or String.contains?(&1, "docs"))) ->
         "documentation"
 
+      Enum.any?(labels, &(&1 in ["test", "tests", "testing"])) ->
+        "test"
+
       Enum.any?(labels, &String.contains?(&1, "feature")) ->
         "feature"
 
@@ -86,10 +89,30 @@ defmodule Asher.Survey do
   # --- Step 2: category ------------------------------------------------------
 
   defp ask_category(default) do
-    Console.select("What kind of contribution is this?", Contribution.categories(),
-      default: default
-    )
+    case Console.select(
+           "What kind of contribution is this?",
+           Contribution.categories() ++ [:other],
+           default: default,
+           display: &category_display/1
+         ) do
+      :other -> ask_custom_category()
+      category -> category
+    end
   end
+
+  defp ask_custom_category do
+    case prompt("Enter your category (used as the commit/branch prefix, e.g. perf, chore)") do
+      "" ->
+        Console.say("  A category is required.")
+        ask_custom_category()
+
+      custom ->
+        custom
+    end
+  end
+
+  defp category_display(:other), do: "other (enter your own)"
+  defp category_display(category), do: category
 
   # --- Step 3: repos (repeatable single-select until :done) ------------------
 

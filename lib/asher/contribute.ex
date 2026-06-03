@@ -112,7 +112,9 @@ defmodule Asher.Contribute do
     "chore: scaffold #{branch}\n\nInitial empty commit to open the draft PR for \"#{survey.name}\"."
   end
 
-  defp pr_title(survey), do: survey.name
+  @doc false
+  # e.g. "fix: Add upsert support", "test: Cover the multitenancy path".
+  def pr_title(survey), do: "#{Contribution.category_prefix(survey.category)}: #{survey.name}"
 
   # The standard ash-project pull request template.
   @checklist """

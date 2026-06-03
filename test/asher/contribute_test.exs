@@ -26,6 +26,21 @@ defmodule Asher.ContributeTest do
 
   defp at(body, substr), do: :binary.match(body, substr) |> elem(0)
 
+  describe "pr_title/1 — category-prefixed" do
+    test "prefixes the title with the category's commit prefix" do
+      assert Contribute.pr_title(survey(category: "bug fix")) == "fix: Add upsert support"
+
+      assert Contribute.pr_title(survey(category: "feature", name: "New thing")) ==
+               "feat: New thing"
+
+      assert Contribute.pr_title(survey(category: "test", name: "Cover X")) == "test: Cover X"
+    end
+
+    test "a custom category becomes its own prefix" do
+      assert Contribute.pr_title(survey(category: "perf", name: "Speed up")) == "perf: Speed up"
+    end
+  end
+
   describe "pr_body/2 — ash-project contributor template" do
     test "owning repo: `Closes #n` first, then the checklist, then details" do
       s = survey()

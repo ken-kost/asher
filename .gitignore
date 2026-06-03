@@ -19,6 +19,62 @@ erl_crash.dump
 # Also ignore archive artifacts (built via "mix archive.build").
 *.ez
 
+# The escript binary (built via "mix escript.build").
+/asher
+
 # Ignore package tarball (built via "mix hex.build").
 asher-*.tar
 
+# === asher: cloned org repos (managed; see priv/repos.json) ===
+/ash/
+/ash_admin/
+/ash_ai/
+/ash_appsignal/
+/ash_archival/
+/ash_authentication_oauth2_server/
+/ash_cloak/
+/ash_csv/
+/ash_double_entry/
+/ash_events/
+/ash_graphql/
+/ash_hq/
+/ash_json_api/
+/ash_json_api_wrapper/
+/ash_lua/
+/ash_money/
+/ash_mysql/
+/ash_oban/
+/ash_ops/
+/ash_paper_trail/
+/ash_phoenix/
+/ash_postgres/
+/ash_rate_limiter/
+/ash_scim/
+/ash_slug/
+/ash_sql/
+/ash_sqlite/
+/ash_state_machine/
+/ash_storage/
+/ash_sync/
+/ash_training/
+/ash_tutorial/
+/ash_typescript/
+/ash_weekly/
+/crux/
+/evals/
+/igniter/
+/igniter_css/
+/igniter_js/
+/iterex/
+/opentelemetry_ash/
+/quix/
+/reactor/
+/reactor_file/
+/reactor_process/
+/reactor_req/
+/simple_sat/
+/spark/
+/splode/
+/test_private_package/
+/usage_rules/
+# === end asher clones ===

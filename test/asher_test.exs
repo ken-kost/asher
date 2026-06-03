@@ -1,8 +1,4 @@
 defmodule AsherTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   doctest Asher
-
-  test "greets the world" do
-    assert Asher.hello() == :world
-  end
 end

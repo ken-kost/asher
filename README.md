@@ -155,7 +155,7 @@ command goes through `Asher.Shell`, which is what makes the whole tool testable 
 mix deps.get
 mix test                         # unit tests (pure logic, stubbed gh/git, full survey flow)
 mix test --include integration   # also run a live, read-only sync against ash-project
-mix escript.build                # build the ./asher binary locally
+MIX_ENV=prod mix escript.build   # build the ./asher binary locally (as escript.install does)
 ```
 
 The unit suite stubs every external command, so it never touches the network or your

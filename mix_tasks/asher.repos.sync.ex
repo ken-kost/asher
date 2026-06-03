@@ -53,7 +53,8 @@ defmodule Mix.Tasks.Asher.Repos.Sync do
     case Github.fetch_org_repos(org) do
       {:ok, raw} ->
         entries = Repos.filter(raw, org, opts)
-        {igniter, merged} = Manifest.apply(igniter, org, entries)
+        {merged, changes} = Manifest.changes(org, entries)
+        igniter = Asher.IgniterWrites.write(igniter, changes)
         orgs = merged |> Enum.map(& &1["org"]) |> Enum.uniq() |> length()
 
         Igniter.add_notice(

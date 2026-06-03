@@ -55,7 +55,8 @@ defmodule Mix.Tasks.Asher.Setup do
     case Github.fetch_org_repos(org) do
       {:ok, raw} ->
         entries = Repos.filter(raw, org, opts)
-        {igniter, _merged} = Manifest.apply(igniter, org, entries)
+        {_merged, changes} = Manifest.changes(org, entries)
+        igniter = Asher.IgniterWrites.write(igniter, changes)
 
         igniter
         |> Igniter.add_notice("Synced #{length(entries)} repos from #{org}.")

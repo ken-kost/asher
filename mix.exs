@@ -15,7 +15,11 @@ defmodule Asher.MixProject do
     ]
   end
 
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  # The `mix asher.*` tasks use `Igniter.Mix.Task`, and igniter is a dev/test-only
+  # dependency. So they're compiled only in dev/test; the escript (built in :prod)
+  # compiles just `lib`, which is igniter-free.
+  defp elixirc_paths(:dev), do: ["lib", "mix_tasks"]
+  defp elixirc_paths(:test), do: ["lib", "mix_tasks", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
   # Run "mix help compile.app" to learn about applications.

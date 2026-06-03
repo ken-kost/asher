@@ -104,11 +104,7 @@ defmodule Mix.Tasks.Asher.Init do
   end
 
   defp write_receipt(igniter, survey, owner, results) do
-    survey
-    |> Contribution.receipt_files(owner, results, false)
-    |> Enum.reduce(igniter, fn {path, content}, igniter ->
-      Igniter.create_new_file(igniter, path, content, on_exists: :overwrite)
-    end)
+    Asher.IgniterWrites.write(igniter, Contribution.receipt_files(survey, owner, results, false))
   end
 
   defp summarize(igniter, results) do

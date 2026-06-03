@@ -1,10 +1,9 @@
 defmodule Asher.Manifest do
   @moduledoc """
-  Writes the repo manifest (`priv/repos.json`) and keeps the managed
-  `.gitignore` block of cloned repo directories in sync with it.
-
-  This is the only place that touches `Igniter` for the sync/setup tasks, so
-  `Asher.Repos` stays pure and easy to test.
+  Computes the repo manifest (`priv/repos.json`) and the managed `.gitignore`
+  block of cloned repo directories as `{path, content}` changes. Igniter-free —
+  the caller (a `mix asher.*` task or the `asher` escript) decides how to write
+  them.
   """
 
   alias Asher.Repos
@@ -25,22 +24,6 @@ defmodule Asher.Manifest do
     json = Jason.encode!(merged, pretty: true) <> "\n"
 
     {merged, [{"priv/repos.json", json}, {@gitignore_path, gitignore_content(merged)}]}
-  end
-
-  @doc """
-  Merge `entries` for `org` and queue the file changes onto `igniter`. Returns
-  `{updated_igniter, merged_manifest}`. Used by the `mix asher.*` tasks.
-  """
-  @spec apply(Igniter.t(), String.t(), [map()]) :: {Igniter.t(), [map()]}
-  def apply(igniter, org, entries) do
-    {merged, changes} = changes(org, entries)
-
-    igniter =
-      Enum.reduce(changes, igniter, fn {path, content}, igniter ->
-        Igniter.create_new_file(igniter, path, content, on_exists: :overwrite)
-      end)
-
-    {igniter, merged}
   end
 
   defp gitignore_content(manifest) do

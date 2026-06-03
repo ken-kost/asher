@@ -47,7 +47,8 @@ Asher ships two ways to run, sharing the same engine:
 
 - **Elixir** `~> 1.20` (and Erlang/OTP to match) — to build/install the escript
 - **git**
-- **[GitHub CLI `gh`](https://cli.github.com/)**, installed and authenticated, for `init`:
+- **GitHub CLI `gh`**, installed and authenticated, for `init`. Install it for
+  [Windows](https://cli.github.com/) or [WSL/Ubuntu](https://www.freecodecamp.org/news/github-cli-wsl2-guide/), then:
   ```sh
   gh auth login
   ```

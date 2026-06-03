@@ -64,7 +64,7 @@ Asher ships two ways to run, sharing the same engine:
 Install the escript straight from GitHub:
 
 ```sh
-mix escript.install github <your-fork-or-org>/asher
+mix escript.install github ken-kost/asher
 ```
 
 That builds and installs an `asher` binary into your Mix **escripts** directory. The next
@@ -136,7 +136,7 @@ asher --version
 ### Option B — clone and use the mix tasks
 
 ```sh
-git clone https://github.com/<you>/asher && cd asher
+git clone https://github.com/ken-kost/asher && cd asher
 mix deps.get
 mix asher.setup ash-project
 mix asher.init

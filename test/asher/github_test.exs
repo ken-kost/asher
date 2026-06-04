@@ -118,14 +118,22 @@ defmodule Asher.GithubTest do
     end
   end
 
-  describe "ensure_draft_pr/7 (stubbed gh, idempotent)" do
-    test "returns the created PR url" do
-      StubShell.stub(fn "gh", ["pr", "create" | _], _ ->
-        {"Creating draft pull request\nhttps://github.com/ash-project/ash/pull/123\n", 0}
+  describe "ensure_pr/8 (stubbed gh, idempotent)" do
+    test "returns the created PR url and passes --draft only when asked" do
+      StubShell.stub(fn "gh", ["pr", "create" | rest], _ ->
+        send(self(), {:draft?, "--draft" in rest})
+        {"Creating pull request\nhttps://github.com/ash-project/ash/pull/123\n", 0}
       end)
 
       assert {:ok, "https://github.com/ash-project/ash/pull/123"} =
-               Github.ensure_draft_pr("ash-project", "ash", "ken", "fix/x", "main", "t", "b")
+               Github.ensure_pr("ash-project", "ash", "ken", "fix/x", "main", "t", "b", true)
+
+      assert_received {:draft?, true}
+
+      assert {:ok, _} =
+               Github.ensure_pr("ash-project", "ash", "ken", "fix/x", "main", "t", "b", false)
+
+      assert_received {:draft?, false}
     end
 
     test "looks up the existing PR when one already exists" do
@@ -135,7 +143,7 @@ defmodule Asher.GithubTest do
       end)
 
       assert {:ok, "https://github.com/ash-project/ash/pull/9"} =
-               Github.ensure_draft_pr("ash-project", "ash", "ken", "fix/x", "main", "t", "b")
+               Github.ensure_pr("ash-project", "ash", "ken", "fix/x", "main", "t", "b", true)
     end
   end
 

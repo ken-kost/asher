@@ -64,8 +64,9 @@ defmodule Asher.Contribution do
   @doc """
   Build the machine-readable metadata map for a contribution receipt.
 
-  `results` maps a repo's `full_name` to a map with at least `:status` and,
-  for successes, `:pr_url`.
+  `results` maps a repo's `full_name` to a (string-keyed) status map — at least
+  `"status"` (`"prepared" | "open" | "error"`) and, once published, `"pr_url"`
+  and `"draft"`. The status is merged into each `repos[]` entry.
   """
   @spec metadata_map(map(), String.t() | nil, map(), boolean()) :: map()
   def metadata_map(survey, owner, results, dry_run) do
@@ -79,10 +80,10 @@ defmodule Asher.Contribution do
       "repos" =>
         Enum.map(survey.repos, fn r ->
           %{"org" => r["org"], "name" => r["name"], "full_name" => r["full_name"]}
+          |> Map.merge(Map.get(results, r["full_name"], %{"status" => "prepared"}))
         end),
       "issue" => issue_map(survey.issue),
       "scraped" => scraped_map(survey.scraped),
-      "results" => stringify_results(results),
       "created_at" => timestamp()
     }
   end
@@ -94,8 +95,13 @@ defmodule Asher.Contribution do
   """
   @spec receipt_files(map(), String.t() | nil, map(), boolean()) :: [{Path.t(), String.t()}]
   def receipt_files(survey, owner, results, dry_run) do
-    meta = metadata_map(survey, owner, results, dry_run)
-    folder = folder_name(survey.slug, Enum.map(survey.repos, & &1["name"]))
+    files_for_meta(metadata_map(survey, owner, results, dry_run))
+  end
+
+  @doc "Receipt `[{path, content}]` for an already-built metadata map (used by push)."
+  @spec files_for_meta(map()) :: [{Path.t(), String.t()}]
+  def files_for_meta(meta) do
+    folder = folder_name(meta["slug"], Enum.map(meta["repos"], & &1["name"]))
     dir = Path.join("data", folder)
 
     [
@@ -121,15 +127,16 @@ defmodule Asher.Contribution do
       end
 
     rows =
-      Enum.map_join(meta["results"], "\n", fn {full, r} ->
-        link =
+      Enum.map_join(meta["repos"] || [], "\n", fn r ->
+        status =
           case r do
             %{"pr_url" => url} when is_binary(url) -> "[#{url}](#{url})"
             %{"status" => "error", "error" => e} -> "❌ #{e}"
+            %{"status" => "prepared"} -> "_prepared — run `asher push`_"
             _ -> "—"
           end
 
-        "| `#{full}` | #{link} |"
+        "| `#{r["full_name"]}` | #{status} |"
       end)
 
     rows = if rows == "", do: "| _none_ | _none_ |", else: rows
@@ -172,12 +179,6 @@ defmodule Asher.Contribution do
       "labels" => scraped["labels"] || [],
       "state" => scraped["state"]
     }
-  end
-
-  defp stringify_results(results) do
-    Map.new(results, fn {full, r} ->
-      {full, Map.new(r, fn {k, v} -> {to_string(k), v} end)}
-    end)
   end
 
   # Wrapped so tests can run without a clock dependency; DateTime is fine here

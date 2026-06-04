@@ -5,15 +5,16 @@ defmodule Mix.Tasks.Asher.Init do
 
   @example "mix asher.init"
 
-  @shortdoc "Interactively scaffold a contribution (survey → branch → fork → draft PR)"
+  @shortdoc "Interactively prepare a contribution (survey → clone, branch, fork)"
   @moduledoc """
   #{@shortdoc}
 
   Runs an interactive survey — does it have an issue (scraped if so), what
   category, which repo(s), and a name — then, for each selected repo: clones it
-  if needed, branches off the default branch, forks it to your account, pushes
-  the branch, and opens a **draft PR** referencing the issue. A receipt with all
-  the gathered data is written under `data/`.
+  if needed, branches off the default branch, and forks it to your account. It
+  does **not** open a PR — do your work in the clone, then run `mix asher.push`
+  (or `asher push`) to review the PR body, choose draft or ready, and open it. A
+  receipt with all the gathered data is written under `data/`.
 
   Requires the `gh` CLI, installed and authenticated (`gh auth login`). Run it
   in a terminal — the survey is interactive.
@@ -91,15 +92,16 @@ defmodule Mix.Tasks.Asher.Init do
           "Dry run — no branches, forks, PRs or files were created. A receipt would be written to data/#{folder}/."
         )
 
-      not Console.yes?("Proceed: clone/branch/fork/push and open draft PR(s)?") ->
+      not Console.yes?("Proceed: clone, branch and fork the repo(s)?") ->
         Igniter.add_notice(igniter, "Aborted before any side effects. Nothing changed.")
 
       true ->
-        results = Contribute.run(survey, owner)
+        results = Contribute.prepare(survey, owner)
 
         igniter
         |> write_receipt(survey, owner, results)
         |> summarize(results)
+        |> Igniter.add_notice("Ready. Do your work in the clone(s), then run `mix asher.push #{survey.slug}`.")
     end
   end
 

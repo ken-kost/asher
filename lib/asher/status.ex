@@ -35,8 +35,8 @@ defmodule Asher.Status do
       Console.say("    branch: #{meta["branch"]}")
       Console.say("    repos:  #{Enum.map_join(meta["repos"] || [], ", ", & &1["full_name"])}")
 
-      Enum.each(meta["results"] || %{}, fn {full, r} ->
-        Console.say("    #{full}: #{r["pr_url"] || r["status"]}")
+      Enum.each(meta["repos"] || [], fn r ->
+        Console.say("    #{r["full_name"]}: #{r["pr_url"] || r["status"]}")
       end)
 
       Console.say("")

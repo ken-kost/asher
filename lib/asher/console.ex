@@ -27,19 +27,24 @@ defmodule Asher.Console do
     end
   end
 
-  @doc "Yes/no prompt. Empty defaults to yes; repeats on bad input; raises on EOF."
-  @spec yes?(String.t()) :: boolean()
-  def yes?(question) do
-    case IO.gets(question <> " [Y/n] ") do
+  @doc """
+  Yes/no prompt. Empty input returns `default` (true unless overridden); repeats
+  on bad input; raises on EOF.
+  """
+  @spec yes?(String.t(), boolean()) :: boolean()
+  def yes?(question, default \\ true) do
+    hint = if default, do: "[Y/n]", else: "[y/N]"
+
+    case IO.gets("#{question} #{hint} ") do
       :eof ->
         raise "No input detected when asking for confirmation. Run this in an interactive terminal."
 
       str ->
         case str |> to_string() |> String.trim() do
-          "" -> true
+          "" -> default
           yes when yes in ~w(y Y yes YES) -> true
           no when no in ~w(n N no NO) -> false
-          other -> say("Please answer y or n. Got: #{other}") && yes?(question)
+          other -> say("Please answer y or n. Got: #{other}") && yes?(question, default)
         end
     end
   end

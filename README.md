@@ -25,20 +25,25 @@ Asher ships two ways to run, sharing the same engine:
    them into the current directory as full, independent git repos so you can `cd ash` and
    work.
 
-2. **`asher init`** — runs an interactive survey and scaffolds a contribution:
+2. **`asher init`** — runs an interactive survey and prepares a contribution:
    - *Does it have an issue?* If so, paste the link and asher **scrapes** its title and
      labels (via `gh`) to suggest a category and a name.
    - *What kind of contribution?* — feature / enhancement / bug fix / improvement /
-     documentation.
+     documentation / test, or your own.
    - *Which repo(s)?* — pick one or more from the tracked repos.
    - *Name it* — with a slug suggested from the issue title.
 
-   Then, for each selected repo, it: branches off the default branch, forks the repo to
-   your account, pushes the branch to your fork, and opens a **draft PR** that references
-   the issue (`Closes #N`). A receipt with everything it gathered is written under `data/`.
+   Then, for each selected repo, it clones it, **branches off the default branch, and forks
+   it to your account**. It stops there — **no PR yet**. A receipt with everything it
+   gathered is written under `data/`. Now go do your work in the clone(s).
 
-3. **`data/`** becomes a dashboard of your in-flight contributions — one folder per
-   contribution (e.g. `data/add-upsert-support (ash, ash_sql)/`) holding a human-readable
+3. **`asher push`** — when you're ready, pick the contribution, **review and optionally
+   edit the PR body** (in your `$EDITOR`), choose **draft or ready**, and asher pushes the
+   branch to your fork and opens the PR — titled `fix: …` and referencing the issue with
+   `Closes #N`. The `data/` receipt is updated with the PR link(s).
+
+4. **`data/`** is a dashboard of your in-flight contributions — one folder per contribution
+   (e.g. `data/add-upsert-support (ash, ash_sql)/`) holding a human-readable
    `contribution.md` and a machine-readable `contribution.json`.
 
 ---
@@ -72,8 +77,10 @@ step is to make `asher` runnable from anywhere — see below — then:
 
 ```sh
 mkdir ash-contribs && cd ash-contribs
-asher setup ash-project
-asher init
+asher setup ash-project   # clone the org's repos here
+asher init                # survey → branch + fork (no PR yet)
+cd ash                    # ...do your work, commit...
+asher push                # review the PR body, pick draft/ready, open the PR
 ```
 
 #### Put `asher` on your `PATH`
@@ -160,9 +167,22 @@ asher setup https://github.com/acme        # any org, by URL
 ```
 
 ### `init [--dry-run]`
-The headline command: interactive survey → branch → fork → push → **draft PR** →
-`data/` receipt. Run it in a terminal. `--dry-run` walks the survey and prints the plan
-without creating branches, forks, PRs or files.
+Interactive survey, then for each repo: clone, branch off the default branch, and fork —
+**no PR**. Writes the `data/` receipt. Run it in a terminal. `--dry-run` walks the survey
+and prints the plan without creating branches, forks or files.
+
+### `push [slug] [--draft | --no-draft]`
+Open the PR(s) for a prepared contribution. Picks the contribution (pass its `slug` or
+choose interactively), shows each PR title and body — letting you **edit the body** in your
+`$EDITOR` — asks whether to open it **as a draft**, then pushes the branch to your fork and
+opens the PR. Updates the `data/` receipt with the PR link(s). If you haven't committed any
+work, asher adds an empty commit so the PR has a diff to open against.
+
+```sh
+asher push                       # pick interactively, choose draft when asked
+asher push add-upsert-support    # a specific contribution
+asher push --no-draft            # open a ready-for-review PR
+```
 
 ### `sync <org>`
 Regenerate the manifest for an org without cloning. Re-running an org replaces its
@@ -186,15 +206,17 @@ Read-only dashboard of every contribution recorded under `data/`.
   filter.
 - **Clones** — live in the workspace as independent git repos, gitignored via a managed
   block that tracks the manifest.
-- **Fork-based flow** — asher forks each target repo to your account, pushes the branch to
-  the fork, and opens the draft PR `your-fork:branch → org:default-branch`. Branch names
-  are `<category-prefix>/<slug>` (e.g. `fix/broken-thing`). GitHub needs a diff to open a
-  PR, so asher makes one empty commit to start the branch.
-- **Receipts (`data/`)** — record what contributions are in flight, with links to each PR.
+- **Fork-based flow** — `init` forks each target repo to your account and branches off its
+  default branch (branch names are `<category-prefix>/<slug>`, e.g. `fix/broken-thing`).
+  `push` later opens the PR `your-fork:branch → org:default-branch`, as a draft or ready.
+  GitHub needs a diff to open a PR, so if you haven't committed anything `push` adds one
+  empty commit first.
+- **Receipts (`data/`)** — record what contributions are in flight (status per repo:
+  `prepared` until you push, then the PR link).
 
-Internally, the igniter-free core (`Asher.Survey`, `Asher.Github`, `Asher.Git`,
-`Asher.Manifest`, `Asher.Contribute`) is shared by both the escript (`Asher.CLI`, writing
-files via `Asher.FS`) and the mix tasks (writing files via igniter). Every external
+Internally, the igniter-free core (`Asher.Survey`, `Asher.Contribute`, `Asher.Push`,
+`Asher.Github`, `Asher.Git`, `Asher.Manifest`) is shared by both the escript (`Asher.CLI`,
+writing files via `Asher.FS`) and the mix tasks (writing via igniter). Every external
 command goes through `Asher.Shell`, which is what makes the whole tool testable offline.
 
 ---

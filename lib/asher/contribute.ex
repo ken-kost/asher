@@ -1,25 +1,104 @@
 defmodule Asher.Contribute do
   @moduledoc """
-  The contribution side effects, shared by `mix asher.init` and the `asher init`
-  escript: for each selected repo, clone → branch → fork → push → open the draft
-  PR. Igniter-free (uses `Asher.Git`/`Asher.Github`/`Asher.Console`); callers
-  handle writing the `data/` receipt and any final summary.
+  Contribution side effects, shared by the init and push commands (escript and
+  mix task).
+
+  `prepare/2` (init) clones each repo, branches off its default branch, and forks
+  it — but opens **no** PR. `publish_one/3` (push) ensures a commit, pushes the
+  branch to the fork, and opens the PR (draft or ready). Igniter-free; callers
+  write the `data/` receipt.
   """
 
   alias Asher.{Console, Contribution, Git, Github}
 
+  # --- init: prepare locally (no push, no PR) --------------------------------
+
   @doc """
-  Run the side effects for every selected repo. Returns a map of
-  `full_name => %{status: "ok"|"error", pr_url|error, branch}`.
+  Prepare each selected repo: clone, branch off the default branch, and fork.
+  Opens no PR. Returns `full_name => %{"status" => "prepared" | "error", ...}`.
   """
-  @spec run(map(), String.t()) :: %{optional(String.t()) => map()}
-  def run(survey, owner) do
+  @spec prepare(map(), String.t()) :: %{optional(String.t()) => map()}
+  def prepare(survey, owner) do
     branch = Contribution.branch_name(survey.category, survey.slug)
 
     survey.repos
-    |> Enum.map(fn entry -> {entry["full_name"], one_repo(entry, survey, owner, branch)} end)
+    |> Enum.map(fn entry -> {entry["full_name"], prepare_one(entry, owner, branch)} end)
     |> Map.new()
   end
+
+  defp prepare_one(entry, owner, branch) do
+    org = entry["org"]
+    name = entry["name"]
+    full = entry["full_name"]
+    Console.say("\n== #{full} ==")
+
+    with {:ok, _base} <- ready_branch(org, name, owner, branch) do
+      %{"status" => "prepared", "branch" => branch}
+    else
+      {:error, msg} ->
+        Console.warn("  ✗ #{full}: #{msg}")
+        %{"status" => "error", "branch" => branch, "error" => to_string(msg)}
+    end
+  end
+
+  # --- push: publish one prepared repo ---------------------------------------
+
+  @doc """
+  Publish one repo: ensure the branch/fork, ensure a commit, push to the fork,
+  and open the PR (draft when `opts[:draft]`). `opts` carries `:branch`, `:title`,
+  `:body`, `:draft`. Returns an updated status map.
+  """
+  @spec publish_one(map(), String.t(), keyword()) :: map()
+  def publish_one(entry, owner, opts) do
+    org = entry["org"]
+    name = entry["name"]
+    full = entry["full_name"]
+    branch = Keyword.fetch!(opts, :branch)
+    draft? = Keyword.fetch!(opts, :draft)
+    label = if draft?, do: "draft PR", else: "PR"
+    Console.say("\n== #{full} ==")
+
+    with {:ok, base} <- ready_branch(org, name, owner, branch),
+         {:ok, _} <- step("commit", Git.ensure_commit(name, base, branch, commit_message(branch))),
+         :ok <- step("push", Git.push(name, "fork", branch)),
+         {:ok, url} <-
+           step(
+             label,
+             Github.ensure_pr(org, name, owner, branch, base, opts[:title], opts[:body], draft?)
+           ) do
+      Console.say("  ✓ #{label}: #{url}")
+      %{"status" => "open", "branch" => branch, "pr_url" => url, "draft" => draft?}
+    else
+      {:error, msg} ->
+        Console.warn("  ✗ #{full}: #{msg}")
+        %{"status" => "error", "branch" => branch, "error" => to_string(msg)}
+    end
+  end
+
+  # Clone, fetch, branch off the default branch, fork, add the fork remote.
+  # Idempotent and shared by prepare and publish. Returns `{:ok, base}`.
+  defp ready_branch(org, name, owner, branch) do
+    with :ok <- step("clone", Git.ensure_cloned(name)),
+         {:ok, _} <- step("fetch", Git.fetch(name, "origin")),
+         base <- Github.default_branch(org, name),
+         {:ok, _} <- step("branch #{branch}", Git.checkout_new_branch(name, branch, base)),
+         :ok <- step("fork", Github.ensure_fork(org, name, owner)),
+         :ok <- step("fork remote", Git.ensure_fork_remote(name, owner)) do
+      {:ok, base}
+    end
+  end
+
+  defp step(label, result) do
+    case result do
+      :ok -> Console.say("  · #{label}")
+      {:ok, _} -> Console.say("  · #{label}")
+      {:error, _} -> :noop
+    end
+
+    result
+  end
+
+  # --- output ----------------------------------------------------------------
 
   @doc "Print the contribution summary."
   @spec print_summary(map(), String.t() | nil, boolean()) :: :ok
@@ -36,80 +115,36 @@ defmodule Asher.Contribute do
     """)
   end
 
-  @doc "Print the planned actions (used for dry runs)."
+  @doc "Print what init will prepare (no PRs are opened here)."
   @spec print_plan(map(), String.t() | nil) :: :ok
   def print_plan(survey, owner) do
     branch = Contribution.branch_name(survey.category, survey.slug)
-    Console.say("Planned actions (no changes will be made):")
+    Console.say("Planned (init prepares locally — no PR; run `asher push` to open it):")
 
     Enum.each(survey.repos, fn entry ->
       Console.say(
-        "  #{entry["full_name"]}: branch #{branch} → fork to #{owner || "<you>"} → push → open draft PR"
+        "  #{entry["full_name"]}: clone → branch #{branch} → fork to #{owner || "<you>"}"
       )
     end)
   end
 
-  @doc "Summarize results as `{ok_lines, failed_lines}` for the caller to report."
+  @doc "Summarize results as `{ok_lines, error_lines}` for the caller to report."
   @spec summarize(%{optional(String.t()) => map()}) :: {[String.t()], [String.t()]}
   def summarize(results) do
-    {ok, failed} = Enum.split_with(results, fn {_full, r} -> r.status == "ok" end)
-
-    {Enum.map(ok, fn {full, r} -> "#{full}: #{r.pr_url}" end),
-     Enum.map(failed, fn {full, r} -> "#{full}: #{r.error}" end)}
-  end
-
-  # --- per-repo side effects -------------------------------------------------
-
-  defp one_repo(entry, survey, owner, branch) do
-    org = entry["org"]
-    name = entry["name"]
-    full = entry["full_name"]
-    Console.say("\n== #{full} ==")
-
-    with :ok <- step("clone", Git.ensure_cloned(name)),
-         {:ok, _} <- step("fetch", Git.fetch(name, "origin")),
-         base <- Github.default_branch(org, name),
-         {:ok, _} <- step("branch #{branch}", Git.checkout_new_branch(name, branch, base)),
-         :ok <- step("fork", Github.ensure_fork(org, name, owner)),
-         :ok <- step("fork remote", Git.ensure_fork_remote(name, owner)),
-         {:ok, _} <- step("commit", Git.empty_commit(name, commit_message(branch, survey))),
-         :ok <- step("push", Git.push(name, "fork", branch)),
-         {:ok, url} <-
-           step(
-             "draft PR",
-             Github.ensure_draft_pr(
-               org,
-               name,
-               owner,
-               branch,
-               base,
-               pr_title(survey),
-               pr_body(survey, entry)
-             )
-           ) do
-      Console.say("  ✓ draft PR: #{url}")
-      %{status: "ok", pr_url: url, branch: branch}
-    else
-      {:error, msg} ->
-        Console.warn("  ✗ #{full}: #{msg}")
-        %{status: "error", error: to_string(msg), branch: branch}
-    end
-  end
-
-  defp step(label, result) do
-    case result do
-      :ok -> Console.say("  · #{label}")
-      {:ok, _} -> Console.say("  · #{label}")
-      {:error, _} -> :noop
-    end
-
-    result
+    Enum.reduce(results, {[], []}, fn {full, r}, {ok, err} ->
+      case r["status"] do
+        "open" -> {ok ++ ["#{full}: #{r["pr_url"]}"], err}
+        "prepared" -> {ok ++ ["#{full}: branch `#{r["branch"]}` ready"], err}
+        "error" -> {ok, err ++ ["#{full}: #{r["error"]}"]}
+        _ -> {ok, err}
+      end
+    end)
   end
 
   # --- PR content ------------------------------------------------------------
 
-  defp commit_message(branch, survey) do
-    "chore: scaffold #{branch}\n\nInitial empty commit to open the draft PR for \"#{survey.name}\"."
+  defp commit_message(branch) do
+    "chore: start #{branch}\n\nInitial empty commit so the PR has a diff to open against."
   end
 
   @doc false

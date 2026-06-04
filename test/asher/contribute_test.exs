@@ -1,7 +1,11 @@
 defmodule Asher.ContributeTest do
-  use ExUnit.Case, async: true
+  # async: false — the prepare/publish tests stub the global shell.
+  use ExUnit.Case, async: false
+
+  import ExUnit.CaptureIO
 
   alias Asher.Contribute
+  alias Asher.Test.StubShell
 
   defp survey(opts \\ []) do
     %{
@@ -25,6 +29,65 @@ defmodule Asher.ContributeTest do
   end
 
   defp at(body, substr), do: :binary.match(body, substr) |> elem(0)
+
+  describe "prepare/2 and publish_one/3 (stubbed shell)" do
+    setup do
+      on_exit(&StubShell.reset/0)
+
+      StubShell.stub(fn
+        "gh", ["repo", "view" | _], _ ->
+          {"main", 0}
+
+        "gh", ["pr", "create" | rest], _ ->
+          send(self(), {:pr_create, rest})
+          {"https://github.com/ash-project/ash/pull/7\n", 0}
+
+        "git", ["-C", _, "rev-list", "--count" | _], _ ->
+          {"1", 0}
+
+        _bin, _args, _opts ->
+          {"", 0}
+      end)
+    end
+
+    test "prepare returns a prepared status per repo (no PR)" do
+      s = %{
+        category: "bug fix",
+        slug: "x",
+        repos: [%{"org" => "ash-project", "name" => "ash", "full_name" => "ash-project/ash"}]
+      }
+
+      capture_io(fn -> send(self(), {:res, Contribute.prepare(s, "ken")}) end)
+      assert_received {:res, results}
+
+      assert results["ash-project/ash"]["status"] == "prepared"
+      assert results["ash-project/ash"]["branch"] == "fix/x"
+      refute_received {:pr_create, _}
+    end
+
+    test "publish_one pushes and opens a ready (non-draft) PR" do
+      entry = %{"org" => "ash-project", "name" => "ash", "full_name" => "ash-project/ash"}
+
+      capture_io(fn ->
+        info =
+          Contribute.publish_one(entry, "ken",
+            branch: "fix/x",
+            title: "fix: X",
+            body: "b",
+            draft: false
+          )
+
+        send(self(), {:res, info})
+      end)
+
+      assert_received {:res, info}
+      assert info["status"] == "open"
+      assert info["pr_url"] == "https://github.com/ash-project/ash/pull/7"
+      assert info["draft"] == false
+      assert_received {:pr_create, rest}
+      refute "--draft" in rest
+    end
+  end
 
   describe "pr_title/1 — category-prefixed" do
     test "prefixes the title with the category's commit prefix" do

@@ -57,9 +57,28 @@ defmodule Asher.Git do
     end
   end
 
-  @doc "Create an empty commit so a draft PR has a diff to open against."
+  @doc "Check out an existing ref/branch."
+  @spec checkout(String.t(), String.t()) :: {:ok, String.t()} | {:error, String.t()}
+  def checkout(name, ref), do: git(name, ["checkout", ref])
+
+  @doc "Create an empty commit so a PR has a diff to open against."
   @spec empty_commit(String.t(), String.t()) :: {:ok, String.t()} | {:error, String.t()}
   def empty_commit(name, message), do: git(name, ["commit", "--allow-empty", "-m", message])
+
+  @doc """
+  Ensure `branch` has at least one commit beyond `origin/<base>` so a PR can be
+  opened. If the contributor has already committed work, this is a no-op;
+  otherwise it adds an empty commit.
+  """
+  @spec ensure_commit(String.t(), String.t(), String.t(), String.t()) ::
+          {:ok, term()} | {:error, String.t()}
+  def ensure_commit(name, base, branch, message) do
+    case git(name, ["rev-list", "--count", "origin/#{base}..#{branch}"]) do
+      {:ok, "0"} -> empty_commit(name, message)
+      {:ok, _ahead} -> {:ok, :has_commits}
+      error -> error
+    end
+  end
 
   @doc "Add the user's fork as a `fork` remote unless it is already present."
   @spec ensure_fork_remote(String.t(), String.t()) :: :ok | {:error, String.t()}

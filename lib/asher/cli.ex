@@ -3,10 +3,10 @@ defmodule Asher.CLI do
   Entry point for the standalone `asher` escript.
 
   Provides the same workflow as the `mix asher.*` tasks — `setup`, `init`,
-  `sync`, `status` — but as a global command that bundles its dependencies and
-  needs no Mix project. It reuses asher's igniter-free core (`Asher.Survey`,
-  `Asher.Contribute`, `Asher.Manifest`, `Asher.Github`, `Asher.Git`) and writes
-  files directly via `Asher.FS`.
+  `push`, `sync`, `status` — but as a global command that bundles its
+  dependencies and needs no Mix project. It reuses asher's igniter-free core
+  (`Asher.Survey`, `Asher.Contribute`, `Asher.Push`, `Asher.Manifest`,
+  `Asher.Github`, `Asher.Git`) and writes files directly via `Asher.FS`.
 
   Build with `mix escript.build`; install with `mix escript.install github <you>/asher`.
   """
@@ -19,6 +19,7 @@ defmodule Asher.CLI do
     Git,
     Github,
     Manifest,
+    Push,
     Repos,
     Status,
     Survey,
@@ -36,6 +37,9 @@ defmodule Asher.CLI do
 
       ["init" | rest] ->
         init(rest)
+
+      ["push" | rest] ->
+        push(rest)
 
       ["sync" | rest] ->
         sync(rest)
@@ -172,21 +176,42 @@ defmodule Asher.CLI do
         folder = Contribution.folder_name(survey.slug, Enum.map(survey.repos, & &1["name"]))
         Console.say("\nDry run — nothing created. A receipt would be written to data/#{folder}/.")
 
-      not Console.yes?("Proceed: clone/branch/fork/push and open draft PR(s)?") ->
+      not Console.yes?("Proceed: clone, branch and fork the repo(s)?") ->
         Console.say("Aborted. Nothing changed.")
 
       true ->
-        results = Contribute.run(survey, owner)
+        results = Contribute.prepare(survey, owner)
         survey |> Contribution.receipt_files(owner, results, false) |> FS.write_all!()
-        report(results)
+        report_prepared(results, survey)
     end
   end
 
-  defp report(results) do
+  defp report_prepared(results, survey) do
     {ok, failed} = Contribute.summarize(results)
     Console.say("")
     Enum.each(ok, fn line -> Console.say("✓ #{line}") end)
     Enum.each(failed, fn line -> Console.warn("✗ #{line}") end)
+
+    if failed == [] do
+      Console.say(
+        "\nReady. Do your work in the clone(s), then run `asher push #{survey.slug}` to open the PR(s)."
+      )
+    end
+  end
+
+  # --- push ------------------------------------------------------------------
+
+  defp push(rest) do
+    {opts, positional, _} = OptionParser.parse(rest, strict: [draft: :boolean])
+
+    case Push.run(List.first(positional), opts) do
+      {:ok, changes} ->
+        FS.write_all!(changes)
+
+      {:error, msg} ->
+        Console.warn(msg)
+        halt(1)
+    end
   end
 
   # --- help ------------------------------------------------------------------
@@ -199,7 +224,9 @@ defmodule Asher.CLI do
       asher setup <org> [repo ...] [--lang L] [--include a,b] [--exclude c,d] [--no-clone]
           Sync an org's active repos into priv/repos.json and clone them here.
       asher init [--dry-run]
-          Interactive survey → branch → fork → push → draft PR. Needs `gh` + `gh auth login`.
+          Interactive survey → clone, branch and fork (no PR). Needs `gh` + `gh auth login`.
+      asher push [slug] [--draft | --no-draft]
+          Review/edit the PR body, choose draft or ready, then push and open the PR(s).
       asher sync <org> [--lang L] [--include a,b] [--exclude c,d]
           Sync the manifest only (no cloning).
       asher status
@@ -208,9 +235,9 @@ defmodule Asher.CLI do
 
     EXAMPLES
       asher setup ash-project
-      asher setup ash-project --lang elixir
-      asher init
-      asher init --dry-run
+      asher init                 # prepare a contribution (do your work, then push)
+      asher push                 # review, then open the PR
+      asher push --no-draft      # open a ready-for-review PR
     """
   end
 

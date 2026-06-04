@@ -224,35 +224,27 @@ defmodule Asher.Github do
   end
 
   @doc """
-  Open a draft PR `owner:branch -> org:base`, returning its URL. If one already
-  exists, look it up and return that URL instead (idempotent).
+  Open a PR `owner:branch -> org:base`, as a draft when `draft?` is true,
+  returning its URL. If one already exists, look it up and return that URL
+  instead (idempotent).
   """
-  @spec ensure_draft_pr(
+  @spec ensure_pr(
           String.t(),
           String.t(),
           String.t(),
           String.t(),
           String.t(),
           String.t(),
-          String.t()
+          String.t(),
+          boolean()
         ) ::
           {:ok, String.t()} | {:error, String.t()}
-  def ensure_draft_pr(org, repo, owner, branch, base, title, body) do
-    args = [
-      "pr",
-      "create",
-      "--repo",
-      "#{org}/#{repo}",
-      "--head",
-      "#{owner}:#{branch}",
-      "--base",
-      base,
-      "--draft",
-      "--title",
-      title,
-      "--body",
-      body
-    ]
+  def ensure_pr(org, repo, owner, branch, base, title, body, draft?) do
+    draft_flag = if draft?, do: ["--draft"], else: []
+
+    args =
+      ["pr", "create", "--repo", "#{org}/#{repo}", "--head", "#{owner}:#{branch}", "--base", base] ++
+        draft_flag ++ ["--title", title, "--body", body]
 
     case Shell.cmd("gh", args, stderr_to_stdout: true) do
       {out, 0} ->

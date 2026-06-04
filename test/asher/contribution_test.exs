@@ -72,22 +72,43 @@ defmodule Asher.ContributionTest do
       }
 
       results = %{
-        "ash-project/ash" => %{status: "ok", pr_url: "https://pr/1", branch: "feat/add-x"}
+        "ash-project/ash" => %{
+          "status" => "open",
+          "pr_url" => "https://pr/1",
+          "branch" => "feat/add-x"
+        }
       }
 
       %{meta: Contribution.metadata_map(survey, "ken", results, false)}
     end
 
-    test "captures the gathered data", %{meta: meta} do
+    test "captures the gathered data and merges per-repo status into repos[]", %{meta: meta} do
       assert meta["name"] == "Add X"
       assert meta["branch"] == "feat/add-x"
       assert meta["fork_owner"] == "ken"
       assert meta["dry_run"] == false
       assert meta["issue"]["number"] == 7
       assert meta["scraped"]["labels"] == ["enhancement"]
-      assert meta["results"]["ash-project/ash"]["pr_url"] == "https://pr/1"
-      assert meta["results"]["ash-project/ash"]["status"] == "ok"
+
+      repo = hd(meta["repos"])
+      assert repo["full_name"] == "ash-project/ash"
+      assert repo["status"] == "open"
+      assert repo["pr_url"] == "https://pr/1"
       assert is_binary(meta["created_at"])
+    end
+
+    test "repos without a result default to prepared", %{} do
+      survey = %{
+        name: "N",
+        slug: "n",
+        category: "feature",
+        repos: [%{"org" => "o", "name" => "r", "full_name" => "o/r"}],
+        issue: nil,
+        scraped: nil
+      }
+
+      meta = Contribution.metadata_map(survey, "ken", %{}, false)
+      assert hd(meta["repos"])["status"] == "prepared"
     end
 
     test "json-round-trips (jason-encodable)", %{meta: meta} do

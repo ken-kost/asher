@@ -65,7 +65,7 @@ defmodule Asher.SurveyTest do
 
     assert survey.issue == nil
     assert survey.scraped == nil
-    assert survey.category == "bug fix"
+    assert survey.category == "fix"
     assert Enum.map(survey.repos, & &1["name"]) == ["ash", "ash_postgres"]
     assert survey.name == "Custom Name"
     assert survey.slug == "custom-name"
@@ -75,11 +75,11 @@ defmodule Asher.SurveyTest do
     StubShell.stub(fn _, _, _ -> {"", 0} end)
 
     # category index 5 is `test`
-    s1 = run("n\n5\n1\n0\nAdd tests\n")
+    s1 = run("n\n6\n1\n0\nAdd tests\n")
     assert s1.category == "test"
 
     # index 6 is `other` → next input is the custom category
-    s2 = run("n\n6\nperf\n1\n0\nSpeed things up\n")
+    s2 = run("n\n7\nperf\n1\n0\nSpeed things up\n")
     assert s2.category == "perf"
     assert Enum.map(s2.repos, & &1["name"]) == ["ash"]
   end
@@ -92,7 +92,7 @@ defmodule Asher.SurveyTest do
     assert survey.issue.number == 42
     assert survey.issue.url == nil
     assert survey.scraped == nil
-    assert survey.category == "bug fix"
+    assert survey.category == "fix"
     # issue repo (ash) was still prefilled, "0" finishes
     assert Enum.map(survey.repos, & &1["name"]) == ["ash"]
     assert survey.name == "My thing"

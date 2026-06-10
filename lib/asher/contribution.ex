@@ -4,7 +4,7 @@ defmodule Asher.Contribution do
   folder naming, and the metadata receipt written under `data/`.
   """
 
-  @categories ["feature", "enhancement", "bug fix", "improvement", "documentation", "test"]
+  @categories ["feature", "enhancement", "fix", "chore", "improvement", "documentation", "test"]
 
   @prefixes %{
     "feature" => "feat",

@@ -62,7 +62,7 @@ defmodule Asher.Survey do
 
     cond do
       Enum.any?(labels, &(&1 in ["bug", "kind:bug", "type:bug"])) ->
-        "bug fix"
+        "fix"
 
       Enum.any?(labels, &String.contains?(&1, "enhancement")) ->
         "enhancement"

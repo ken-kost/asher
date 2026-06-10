@@ -46,12 +46,12 @@ defmodule Asher.SurveyTest do
   test "with an issue: scrapes it, pre-selects category, prefills repo, suggests name" do
     StubShell.stub(fn "gh", ["issue", "view", "42" | _], _ -> {issue_payload(), 0} end)
 
-    # y → issue url → (empty = default category "bug fix") → 0 (done, ash prefilled) → (empty = default name)
+    # y → issue url → (empty = default category "fix") → 0 (done, ash prefilled) → (empty = default name)
     survey = run("y\nhttps://github.com/ash-project/ash/issues/42\n\n0\n\n")
 
     assert survey.issue.number == 42
     assert survey.issue.full_name == "ash-project/ash"
-    assert survey.category == "bug fix"
+    assert survey.category == "fix"
     assert Enum.map(survey.repos, & &1["name"]) == ["ash"]
     assert survey.name == "Fix the bug"
     assert survey.slug == "fix-the-bug"
@@ -100,7 +100,7 @@ defmodule Asher.SurveyTest do
 
   describe "derive_category/1" do
     test "maps common labels" do
-      assert Survey.derive_category(%{"labels" => ["bug"]}) == "bug fix"
+      assert Survey.derive_category(%{"labels" => ["bug"]}) == "fix"
       assert Survey.derive_category(%{"labels" => ["enhancement"]}) == "enhancement"
       assert Survey.derive_category(%{"labels" => ["documentation"]}) == "documentation"
       assert Survey.derive_category(%{"labels" => ["test"]}) == "test"

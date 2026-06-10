@@ -16,7 +16,6 @@ defmodule Asher.CLI do
     Contribute,
     Contribution,
     FS,
-    Git,
     Github,
     Manifest,
     Push,
@@ -95,46 +94,12 @@ defmodule Asher.CLI do
 
   defp setup(rest) do
     {opts, positional, _} =
-      OptionParser.parse(rest,
-        strict: [lang: :string, include: :string, exclude: :string, no_clone: :boolean]
-      )
+      OptionParser.parse(rest, strict: [lang: :string, include: :string, exclude: :string])
 
-    {org_arg, repo_names} =
-      case positional do
-        [] -> {nil, []}
-        [org | repos] -> {org, repos}
-      end
-
-    org = Github.parse_org(org_arg)
-    entries = do_sync(org, Tasks.parse_filter_opts(opts))
-
-    cond do
-      opts[:no_clone] -> Console.say("Skipped cloning (--no-clone).")
-      true -> clone(entries, repo_names)
-    end
+    org = Github.parse_org(List.first(positional))
+    do_sync(org, Tasks.parse_filter_opts(opts))
+    Console.say("Run `asher init` to start a contribution — repos are cloned on demand.")
   end
-
-  defp clone(entries, names) do
-    entries
-    |> filter_by_names(names)
-    |> Enum.each(fn entry ->
-      name = entry["name"]
-
-      cond do
-        Git.cloned?(name) ->
-          Console.say("#{name}: already cloned, skipping")
-
-        true ->
-          case Git.clone_entry(entry) do
-            :ok -> Console.say("#{name}: cloned")
-            {:error, msg} -> Console.warn("#{name}: clone failed — #{msg}")
-          end
-      end
-    end)
-  end
-
-  defp filter_by_names(entries, []), do: entries
-  defp filter_by_names(entries, names), do: Enum.filter(entries, &(&1["name"] in names))
 
   # --- init ------------------------------------------------------------------
 
@@ -221,10 +186,11 @@ defmodule Asher.CLI do
     asher #{@version} — scaffold contributions to a GitHub org's repos.
 
     USAGE
-      asher setup <org> [repo ...] [--lang L] [--include a,b] [--exclude c,d] [--no-clone]
-          Sync an org's active repos into priv/repos.json and clone them here.
+      asher setup <org> [--lang L] [--include a,b] [--exclude c,d]
+          Sync an org's active repos into priv/repos.json (no cloning).
       asher init [--dry-run]
-          Interactive survey → clone, branch and fork (no PR). Needs `gh` + `gh auth login`.
+          Survey, then for the selected repo(s): clone-or-update, branch and fork
+          (lazily, no PR). Needs `gh` + `gh auth login`.
       asher push [slug] [--draft | --no-draft]
           Review/edit the PR body, choose draft or ready, then push and open the PR(s).
       asher sync <org> [--lang L] [--include a,b] [--exclude c,d]

@@ -75,16 +75,37 @@ defmodule Asher.Contribute do
     end
   end
 
-  # Clone, fetch, branch off the default branch, fork, add the fork remote.
-  # Idempotent and shared by prepare and publish. Returns `{:ok, base}`.
+  # Lazily clone the repo (or update it from remote if already present), fetch,
+  # branch off the latest default branch, fork, add the fork remote. Idempotent
+  # and shared by prepare and publish. Returns `{:ok, base}`.
   defp ready_branch(org, name, owner, branch) do
-    with :ok <- step("clone", Git.ensure_cloned(name)),
-         {:ok, _} <- step("fetch", Git.fetch(name, "origin")),
+    with {:ok, _} <- ensure_repo(name),
+         {:ok, _} <- step("fetch latest", Git.fetch(name, "origin")),
          base <- Github.default_branch(org, name),
-         {:ok, _} <- step("branch #{branch}", Git.checkout_new_branch(name, branch, base)),
+         {:ok, _} <-
+           step(
+             "branch #{branch} (off origin/#{base})",
+             Git.checkout_new_branch(name, branch, base)
+           ),
          :ok <- step("fork", Github.ensure_fork(org, name, owner)),
          :ok <- step("fork remote", Git.ensure_fork_remote(name, owner)) do
       {:ok, base}
+    end
+  end
+
+  # Clone on first use; if already present, leave it and let the fetch above
+  # sync it with the remote.
+  defp ensure_repo(name) do
+    if Git.cloned?(name) do
+      Console.say("  · #{name} already present — updating from remote")
+      {:ok, :present}
+    else
+      Console.say("  · cloning #{name}")
+
+      case Git.ensure_cloned(name) do
+        :ok -> {:ok, :cloned}
+        error -> error
+      end
     end
   end
 
